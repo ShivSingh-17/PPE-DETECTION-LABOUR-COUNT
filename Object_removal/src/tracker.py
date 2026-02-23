@@ -1,0 +1,56 @@
+
+
+
+import numpy as np
+from scipy.spatial import distance as dist
+
+class CentroidTracker:
+
+    def __init__(self, max_disappeared=75):
+        self.next_id = 0
+        self.objects = {}
+        self.disappeared = {}
+        self.max_disappeared = max_disappeared
+
+    def register(self, centroid):
+        self.objects[self.next_id] = centroid
+        self.disappeared[self.next_id] = 0
+        self.next_id += 1
+
+    def deregister(self, object_id):
+        del self.objects[object_id]
+        del self.disappeared[object_id]
+
+    def update(self, rects):
+
+        if len(rects) == 0:
+            for object_id in list(self.disappeared.keys()):
+                self.disappeared[object_id] += 1
+            return self.objects
+
+        input_centroids = np.zeros((len(rects), 2), dtype="int")
+
+        for (i, (x1, y1, x2, y2)) in enumerate(rects):
+            cx = int((x1+x2)/2)
+            cy = int((y1+y2)/2)
+            input_centroids[i] = (cx, cy)
+
+        if len(self.objects) == 0:
+            for centroid in input_centroids:
+                self.register(centroid)
+
+        else:
+            object_ids = list(self.objects.keys())
+            object_centroids = list(self.objects.values())
+
+            D = dist.cdist(np.array(object_centroids), input_centroids)
+
+            rows = D.min(axis=1).argsort()
+            cols = D.argmin(axis=1)[rows]
+
+            for (row, col) in zip(rows, cols):
+                object_id = object_ids[row]
+                self.objects[object_id] = input_centroids[col]
+                self.disappeared[object_id] = 0
+
+        return self.objects
